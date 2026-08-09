@@ -202,7 +202,7 @@ async def process_poster(message: Message, state: FSMContext):
     caption = (
         f"<b>🎬 {title.upper()}</b>\n"
         f"━━━━━━━━━━━━━━━━━\n"
-        f"🔈 Language: {language}\n"
+        f"🔈 Language: <b>{language}</b>\n"
         f"<blockquote>IMDB = {data['imdb']} ⭐</blockquote>\n"
         f"OTT = {data['ott']} 🍿\n"
         f"━━━━━━━━━━━━━━━━━\n"
