@@ -1,0 +1,8 @@
+Here is a compact guide for running your bot locally on Windows:
+
+* **Open Terminal**: Open your project folder in VS Code and open a new terminal.
+* **Create Environment**: Run `python -m venv venv` to create a virtual environment.
+* **Activate Environment**: Run `venv\Scripts\activate` to turn it on (you should see `(venv)` appear).
+* **Install Requirements**: Run `pip install -r requirements.txt` to install the necessary libraries.
+* **Check Config**: Ensure your `.env` file is in the root folder with all your proper token and ID variables.
+* **Run Bot**: Type `python bot.py` to launch your bot.

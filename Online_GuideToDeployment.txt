@@ -1,0 +1,37 @@
+Step 1: Create a New "Background Worker" on Render
+Because your bot uses dp.start_polling() (meaning it runs continuously in the background listening for updates), it must be deployed as a Background Worker, not a Web Service.
+1. Once logged into the Render Dashboard, click the New +" button at the top right.
+2. Select Background Worker.
+3. Click Connect repository next to your GitHub account and select your CONTENT VAULT TELEGRAM repository.
+Step 2: Configure Your Render Settings
+You will see a configuration page. Fill it out with these exact settings:
+* Name: content-vault-bot (or any name you like)
+* Region: Choose the closest region to you (e.g., Frankfurt or Ohio)
+* Branch: main
+* Root Directory: Leave blank (or . since your files are in the main folder)
+* Runtime: Python 3
+* Build Command: pip install -r requirements.txt
+* Start Command: python bot.py
+* Instance Type: Select Free
+Step 3: Add Your Environment Variables (Securely)
+Scroll down on that same Render deployment page until you see the Environment Variables section. Click Add Environment Variable and add each of your keys one by one (copying them right out of your local .env file):
+Key
+Value Example
+BOT_TOKEN
+8774961132xxxxxxxxxxxxxxxxxxxxxx
+PRIVATE_CHANNEL_ID
+-100xxxxxxxxxx
+PUBLIC_CHANNEL_ID
+-1004xxxxxxxxx
+PUBLIC_CHANNEL_USERNAME
+parrot_AEP
+ADMIN_ID
+5xxxxxxxxxx
+Step 7: Deploy!
+1. Scroll down to the bottom and click the Create Background Worker button.
+2. Render will automatically open a deployment console log window. It will pull your code from GitHub, install aiogram and python-dotenv using your requirements.txt, and boot up your bot.
+3. Within a minute, you should see your print statement appear in the logs:
+Bot is online :)
+Important Note on Render's Free Tier:
+Render's free tier background workers can sometimes spin down or restart after periods of inactivity, but they will automatically boot back up. Your bot is now running 24/7 in the cloud without needing your personal computer to stay on!
+
