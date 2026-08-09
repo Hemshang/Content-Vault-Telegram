@@ -1,20 +1,20 @@
 import os
-from dotenv import load_dotenv
 import asyncio
 import uuid
 import re
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from dotenv import load_dotenv
+from aiohttp import web
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, CommandObject
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.context import FSMContext
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
-# Load variables from the .env file
 load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -23,6 +23,12 @@ PUBLIC_CHANNEL_ID = int(os.getenv("PUBLIC_CHANNEL_ID"))
 PUBLIC_CHANNEL_USERNAME = os.getenv("PUBLIC_CHANNEL_USERNAME")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))                
 
+# Render Environment Variables
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "https://content-vault-telegram.onrender.com")
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
+
+PORT = int(os.getenv("PORT", 10000))
 DELETE_DELAY = 300  # 5 minutes
 
 bot = Bot(token=BOT_TOKEN)
@@ -42,20 +48,6 @@ class QuickPostForm(StatesGroup):
     poster = State()
 
 # ============================================================
-# DUMMY WEB SERVER FOR RENDER FREE TIER
-# ============================================================
-class SimpleHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is running!")
-
-def run_dummy_server():
-    port = int(os.environ.get("PORT", 10000))
-    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
-    server.serve_forever()
-
-# ============================================================
 # AUTO-DELETION HELPER
 # ============================================================
 async def delete_messages_after_delay(chat_id: int, message_ids: list[int], delay: int):
@@ -70,7 +62,7 @@ async def delete_messages_after_delay(chat_id: int, message_ids: list[int], dela
 # AUTOMATED UPLOAD LISTENER
 # ============================================================
 async def send_admin_notification(msg_ids: list):
-    msg_ids.sort() # Ensure top-to-bottom order
+    msg_ids.sort()
     upload_id = str(uuid.uuid4())[:8]
     PENDING_UPLOADS[upload_id] = msg_ids  
     
@@ -91,7 +83,6 @@ async def auto_detect_private_upload(message: Message):
     if message.chat.id != PRIVATE_CHANNEL_ID:
         return
 
-    # Handle albums/multiple files
     if message.media_group_id:
         mg_id = message.media_group_id
         if mg_id not in MEDIA_GROUPS:
@@ -104,7 +95,6 @@ async def auto_detect_private_upload(message: Message):
             asyncio.create_task(process_media_group(mg_id))
         MEDIA_GROUPS[mg_id].append(message.message_id)
     else:
-        # Handle single file
         await send_admin_notification([message.message_id])
 
 # ============================================================
@@ -234,7 +224,7 @@ async def process_poster(message: Message, state: FSMContext):
     await state.clear()
 
 # ============================================================
-# USER DELIVERY HANDLERS (Direct Fetching via URL Payload)
+# USER DELIVERY HANDLERS
 # ============================================================
 @dp.message(CommandStart())
 async def handle_start(message: Message, command: CommandObject):
@@ -291,15 +281,35 @@ async def handle_start(message: Message, command: CommandObject):
             await message.answer("❌ Could not deliver file. It may have been removed.")
         return
 
-async def main():
-    # Start the dummy web server in a separate background thread for Render free web service port binding
-    threading.Thread(target=run_dummy_server, daemon=True).start()
+# ============================================================
+# WEBHOOK LIFECYCLE HANDLERS
+# ============================================================
+async def on_startup(bot: Bot) -> None:
+    # Registers the webhook with Telegram
+    await bot.set_webhook(f"{WEBHOOK_URL}", drop_pending_updates=True)
+    print(f"Webhook set to {WEBHOOK_URL}")
 
-    # Clear active webhooks from Telegram servers
-    await bot.delete_webhook(drop_pending_updates=True)
+async def health_check(request):
+    return web.Response(text="Bot is alive!")
+
+def main() -> None:
+    dp.startup.register(on_startup)
+
+    app = web.Application()
     
-    print("Bot is online :)")
-    await dp.start_polling(bot)
+    # Root route for browser checks / health check
+    app.router.add_get("/", health_check)
+
+    # Webhook handler for Telegram updates
+    webhook_requests_handler = SimpleRequestHandler(
+        dispatcher=dp,
+        bot=bot,
+    )
+    webhook_requests_handler.register(app, path=WEBHOOK_PATH)
+
+    setup_application(app, dp, bot=bot)
+
+    web.run_app(app, host="0.0.0.0", port=PORT)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
