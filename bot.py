@@ -3,6 +3,8 @@ from dotenv import load_dotenv
 import asyncio
 import uuid
 import re
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import CommandStart, CommandObject
@@ -38,6 +40,20 @@ class QuickPostForm(StatesGroup):
     ott = State()
     qualities_list = State()
     poster = State()
+
+# ============================================================
+# DUMMY WEB SERVER FOR RENDER FREE TIER
+# ============================================================
+class SimpleHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is running!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 10000))
+    server = HTTPServer(('0.0.0.0', port), SimpleHandler)
+    server.serve_forever()
 
 # ============================================================
 # AUTO-DELETION HELPER
@@ -276,7 +292,10 @@ async def handle_start(message: Message, command: CommandObject):
         return
 
 async def main():
-    # Forces Telegram to clear any active webhooks stuck from Render or remote servers
+    # Start the dummy web server in a separate background thread for Render free web service port binding
+    threading.Thread(target=run_dummy_server, daemon=True).start()
+
+    # Clear active webhooks from Telegram servers
     await bot.delete_webhook(drop_pending_updates=True)
     
     print("Bot is online :)")
